@@ -1,4 +1,4 @@
-package examplefuncsplayer;
+package himothee;
 
 import java.util.Random;
 
@@ -12,6 +12,7 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
+
 
 
 /**
@@ -79,7 +80,7 @@ public class RobotPlayer {
                 switch (rc.getType()){
                     case SOLDIER: runSoldier(rc); break; 
                     case MOPPER: runMopper(rc); break;
-                    case SPLASHER: break; // Consider upgrading examplefuncsplayer to use splashers!
+                    case SPLASHER: runSplasher(rc); break; // Consider upgrading examplefuncsplayer to use splashers!
                     default: runTower(rc); break;
                     }
                 }
@@ -112,6 +113,9 @@ public class RobotPlayer {
      * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
      */
     public static void runTower(RobotController rc) throws GameActionException{
+        if(rc.canUpgradeTower(rc.getLocation())){
+            rc.upgradeTower(rc.getLocation());
+        }
         // Pick a direction to build in.
         Direction dir = directions[rng.nextInt(directions.length)];
         MapLocation nextLoc = rc.getLocation().add(dir);
@@ -121,15 +125,14 @@ public class RobotPlayer {
             rc.buildRobot(UnitType.SOLDIER, nextLoc);
             System.out.println("BUILT A SOLDIER");
         }
-        else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
-            rc.buildRobot(UnitType.MOPPER, nextLoc);
-            System.out.println("BUILT A MOPPER");
-        }
-        else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
-            // rc.buildRobot(UnitType.SPLASHER, nextLoc);
-            // System.out.println("BUILT A SPLASHER");
-            rc.setIndicatorString("SPLASHER NOT IMPLEMENTED YET");
-        }
+        // else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
+        //     rc.buildRobot(UnitType.MOPPER, nextLoc);
+        //     System.out.println("BUILT A MOPPER");
+        // }
+        // else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
+        //     rc.buildRobot(UnitType.SPLASHER, nextLoc);
+        //     System.out.println("BUILT A SPLASHER");
+        // }
 
         // Read incoming messages
         Message[] messages = rc.readMessages(-1);
@@ -137,7 +140,12 @@ public class RobotPlayer {
             System.out.println("Tower received message: '#" + m.getSenderID() + " " + m.getBytes());
         }
 
-        // TODO: can we attack other bots?
+        RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
+        for(RobotInfo robot: nearbyRobots){
+            if(rc.canAttack(robot.getLocation())){
+                rc.attack(robot.getLocation());
+            } 
+        }
     }
 
 
@@ -148,12 +156,22 @@ public class RobotPlayer {
     public static void runSoldier(RobotController rc) throws GameActionException{
         // Sense information about all visible nearby tiles.
         MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
+        RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
         // Search for a nearby ruin to complete.
         MapInfo curRuin = null;
         for (MapInfo tile : nearbyTiles){
             if (tile.hasRuin()){
                 curRuin = tile;
             }
+        }
+        RobotInfo curTower = null;
+        for (RobotInfo tower : nearbyRobots){
+            if (tower.getType().ordinal() >= 0 && tower.getType().ordinal() <= 8){
+                curTower = tower;
+            }
+        }
+        if(curRuin != null && rc.canSenseRobotAtLocation(curRuin.getMapLocation())){
+            curRuin = null;
         }
         if (curRuin != null){
             MapLocation targetLoc = curRuin.getMapLocation();
@@ -177,9 +195,24 @@ public class RobotPlayer {
             // Complete the ruin if we can.
             if (rc.canCompleteTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc)){
                 rc.completeTowerPattern(UnitType.LEVEL_ONE_PAINT_TOWER, targetLoc);
+
                 rc.setTimelineMarker("Tower built", 0, 255, 0);
                 System.out.println("Built a tower at " + targetLoc + "!");
             }
+        }
+
+        // TODO: Retreat if low paint
+        if (rc.getPaint() <= 100){
+            //go nearest tower
+            if(curTower != null){
+                if(rc.canTransferPaint(curTower.getLocation(), -50)){
+                    rc.transferPaint(curTower.getLocation(), -50);
+                }
+                else if(rc.canTransferPaint(curTower.getLocation(), -20)){
+                    rc.transferPaint(curTower.getLocation(), -20);
+                }
+            }
+            
         }
 
         // Move and attack randomly if no objective.
@@ -215,6 +248,27 @@ public class RobotPlayer {
         else if (rc.canAttack(nextLoc)){
             rc.attack(nextLoc);
         }
+        // We can also move our code into different methods or classes to better organize it!
+        updateEnemyRobots(rc);
+    }
+
+        /**
+     * Run a single turn for a Mopper.
+     * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
+     */
+    public static void runSplasher(RobotController rc) throws GameActionException{
+        // Move and attack randomly.
+        Direction dir = directions[rng.nextInt(directions.length)];
+        MapLocation nextLoc = rc.getLocation().add(dir);
+        if (rc.canMove(dir)){
+            rc.move(dir);
+        }
+
+        MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
+        if (!currentTile.getPaint().isAlly() && rc.canAttack(rc.getLocation())){
+            rc.attack(rc.getLocation());
+        }
+
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
     }
