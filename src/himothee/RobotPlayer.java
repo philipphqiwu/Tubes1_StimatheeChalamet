@@ -1,5 +1,6 @@
 package himothee;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 import battlecode.common.Clock;
@@ -27,7 +28,15 @@ public class RobotPlayer {
      * these variables are static, in Battlecode they aren't actually shared between your robots.
      */
     static int turnCount = 0;
+    static boolean isMessenger = false;
+    static boolean isSaving = false;
+    static int savingTurns = 0;
+    static ArrayList<MapLocation> knownTowers = new ArrayList<>();
 
+    private enum MessageType{
+        SAVE_CHIPS
+    }
+    
     /**
      * A random number generator.
      * We will use this RNG to make some random moves. The Random class is provided by the java.util.Random
@@ -63,6 +72,12 @@ public class RobotPlayer {
 
         // You can also use indicators to save debug notes in replays.
         rc.setIndicatorString("Hello world!");
+
+        // && rc.getID() % 2 == 0
+        if(rc.getType() == UnitType.MOPPER && rc.getID() % 2 == 0){
+            System.out.println("I'm a messenger");
+            isMessenger = true;
+        }
 
         while (true) {
             // This code runs during the entire lifespan of the robot, which is why it is in an infinite
@@ -116,28 +131,41 @@ public class RobotPlayer {
         if(rc.canUpgradeTower(rc.getLocation())){
             rc.upgradeTower(rc.getLocation());
         }
-        // Pick a direction to build in.
-        Direction dir = directions[rng.nextInt(directions.length)];
-        MapLocation nextLoc = rc.getLocation().add(dir);
-        // Pick a random robot type to build.
-        int robotType = rng.nextInt(3);
-        if (robotType == 0 && rc.canBuildRobot(UnitType.SOLDIER, nextLoc)){
-            rc.buildRobot(UnitType.SOLDIER, nextLoc);
-            System.out.println("BUILT A SOLDIER");
+        if(savingTurns == 0){
+            isSaving = false;
+            // Pick a direction to build in.
+            Direction dir = directions[rng.nextInt(directions.length)];
+            MapLocation nextLoc = rc.getLocation().add(dir);
+            // Pick a random robot type to build.
+            int robotType = rng.nextInt(3);
+            if (robotType == 0 && rc.canBuildRobot(UnitType.SOLDIER, nextLoc)){
+                rc.buildRobot(UnitType.SOLDIER, nextLoc);
+                System.out.println("BUILT A SOLDIER");
+            }
+            else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
+                rc.buildRobot(UnitType.MOPPER, nextLoc);
+                System.out.println("BUILT A MOPPER");
+            }
+            // else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
+            //     rc.buildRobot(UnitType.SPLASHER, nextLoc);
+            //     System.out.println("BUILT A SPLASHER");
+            // }
+        } else{
+            savingTurns--;
+            rc.setIndicatorString("Saving for " + savingTurns + " more turns.");
+            // System.out.println("HEMAT BRO!");
         }
-        // else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
-        //     rc.buildRobot(UnitType.MOPPER, nextLoc);
-        //     System.out.println("BUILT A MOPPER");
-        // }
-        // else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
-        //     rc.buildRobot(UnitType.SPLASHER, nextLoc);
-        //     System.out.println("BUILT A SPLASHER");
-        // }
+        
 
         // Read incoming messages
         Message[] messages = rc.readMessages(-1);
         for (Message m : messages) {
             System.out.println("Tower received message: '#" + m.getSenderID() + " " + m.getBytes());
+
+            if(m.getBytes() == MessageType.SAVE_CHIPS.ordinal() && !isSaving){
+                savingTurns = 15;
+                isSaving = true; 
+            }
         }
 
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
@@ -159,9 +187,14 @@ public class RobotPlayer {
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
         // Search for a nearby ruin to complete.
         MapInfo curRuin = null;
+        int curDist = 999999;
         for (MapInfo tile : nearbyTiles){
             if (tile.hasRuin()){
-                curRuin = tile;
+                int dist = tile.getMapLocation().distanceSquaredTo(rc.getLocation());
+                if(dist < curDist){
+                    curRuin = tile;
+                    curDist = dist;
+                }
             }
         }
         RobotInfo curTower = null;
@@ -170,9 +203,9 @@ public class RobotPlayer {
                 curTower = tower;
             }
         }
-        if(curRuin != null && rc.canSenseRobotAtLocation(curRuin.getMapLocation())){
-            curRuin = null;
-        }
+        // if(curRuin != null && rc.canSenseRobotAtLocation(curRuin.getMapLocation())){
+        //     curRuin = null;
+        // }
         if (curRuin != null){
             MapLocation targetLoc = curRuin.getMapLocation();
             Direction dir = rc.getLocation().directionTo(targetLoc);
@@ -235,25 +268,104 @@ public class RobotPlayer {
      * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
      */
     public static void runMopper(RobotController rc) throws GameActionException{
+        if(isMessenger){
+            rc.setIndicatorDot(rc.getLocation(), 255, 0, 0);
+        }
+
+        if(isMessenger && isSaving && knownTowers.size() > 0){
+            MapLocation dst = knownTowers.get(0);
+            Direction dir = rc.getLocation().directionTo(dst);
+            if(rc.canMove(dir)){
+                rc.move(dir);
+            }
+        }
+        
         // Move and attack randomly.
         Direction dir = directions[rng.nextInt(directions.length)];
         MapLocation nextLoc = rc.getLocation().add(dir);
         if (rc.canMove(dir)){
             rc.move(dir);
         }
-        if (rc.canMopSwing(dir)){
-            rc.mopSwing(dir);
-            System.out.println("Mop Swing! Booyah!");
-        }
+        // if (rc.canMopSwing(dir)){
+        //     rc.mopSwing(dir);
+        //     System.out.println("Mop Swing! Booyah!");
+        // }
         else if (rc.canAttack(nextLoc)){
             rc.attack(nextLoc);
         }
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
+
+        if(isMessenger){
+            updateFriendlyTowers(rc);
+            checkNearbyRuins(rc);
+        }
     }
 
-        /**
-     * Run a single turn for a Mopper.
+    public static void checkNearbyRuins(RobotController rc) throws GameActionException{
+        // Sense information about all visible nearby tiles.
+        MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
+        for (MapInfo tile : nearbyTiles){
+            if(!tile.hasRuin()) continue;
+            if(rc.senseRobotAtLocation(tile.getMapLocation())!=null) continue;
+
+            Direction dir = tile.getMapLocation().directionTo(rc.getLocation());
+            MapLocation  markTile = tile.getMapLocation().add(dir);
+            if(!rc.senseMapInfo(markTile).getMark().isAlly()) continue;  
+
+            if (tile.hasRuin() && rc.senseRobotAtLocation(tile.getMapLocation()) == null){
+                isSaving = true;
+                return;
+            }
+        }
+    }
+
+    public static void updateFriendlyTowers(RobotController rc) throws GameActionException{
+        RobotInfo[] allyRobots = rc.senseNearbyRobots(-1, rc.getTeam());
+        for (RobotInfo ally : allyRobots){
+            if(!ally.getType().isTowerType()) continue;
+
+            MapLocation allyLoc = ally.location;
+            if(knownTowers.contains(allyLoc)){
+                if(isSaving){
+                    if(rc.canSendMessage(allyLoc)){
+                        rc.sendMessage(allyLoc, MessageType.SAVE_CHIPS.ordinal());
+                        isSaving = false;
+                    }
+                }
+                continue;
+            }
+
+            knownTowers.add(allyLoc);
+        }
+    }
+
+
+    public static void updateEnemyRobots(RobotController rc) throws GameActionException{
+        // Sensing methods can be passed in a radius of -1 to automatically 
+        // use the largest possible value.
+        RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
+        if (enemyRobots.length != 0){
+            rc.setIndicatorString("There are nearby enemy robots! Scary!");
+            // Save an array of locations with enemy robots in them for possible future use.
+            MapLocation[] enemyLocations = new MapLocation[enemyRobots.length];
+            for (int i = 0; i < enemyRobots.length; i++){
+                enemyLocations[i] = enemyRobots[i].getLocation();
+            }
+            RobotInfo[] allyRobots = rc.senseNearbyRobots(-1, rc.getTeam());
+            // Occasionally try to tell nearby allies how many enemy robots we see.
+            // if (rc.getRoundNum() % 20 == 0){
+            //     for (RobotInfo ally : allyRobots){
+            //         if (rc.canSendMessage(ally.location, enemyRobots.length)){
+            //             rc.sendMessage(ally.location, enemyRobots.length);
+            //         }
+            //     }
+            // }
+        }
+    }
+
+    /**
+     * Run a single turn for a splasher.
      * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
      */
     public static void runSplasher(RobotController rc) throws GameActionException{
@@ -271,28 +383,5 @@ public class RobotPlayer {
 
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
-    }
-
-    public static void updateEnemyRobots(RobotController rc) throws GameActionException{
-        // Sensing methods can be passed in a radius of -1 to automatically 
-        // use the largest possible value.
-        RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
-        if (enemyRobots.length != 0){
-            rc.setIndicatorString("There are nearby enemy robots! Scary!");
-            // Save an array of locations with enemy robots in them for possible future use.
-            MapLocation[] enemyLocations = new MapLocation[enemyRobots.length];
-            for (int i = 0; i < enemyRobots.length; i++){
-                enemyLocations[i] = enemyRobots[i].getLocation();
-            }
-            RobotInfo[] allyRobots = rc.senseNearbyRobots(-1, rc.getTeam());
-            // Occasionally try to tell nearby allies how many enemy robots we see.
-            if (rc.getRoundNum() % 20 == 0){
-                for (RobotInfo ally : allyRobots){
-                    if (rc.canSendMessage(ally.location, enemyRobots.length)){
-                        rc.sendMessage(ally.location, enemyRobots.length);
-                    }
-                }
-            }
-        }
     }
 }
