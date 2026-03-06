@@ -1,5 +1,6 @@
 package chamalet;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 import battlecode.common.Clock;
@@ -20,12 +21,20 @@ import battlecode.common.UnitType;
  * is created!
  */
 public class RobotPlayer {
+    private enum MessageType {
+        SAVE_CHIPS
+    }
+
     /**
      * We will use this variable to count the number of turns this robot has been alive.
      * You can use static variables like this to save any information you want. Keep in mind that even though
      * these variables are static, in Battlecode they aren't actually shared between your robots.
      */
     static int turnCount = 0;
+    static boolean isMessenger = false;
+    static ArrayList<MapLocation> knownTowers = new ArrayList<>();
+    static boolean isSaving = false;
+    static int savingTurns = 0;
 
     /**
      * A random number generator.
@@ -62,6 +71,11 @@ public class RobotPlayer {
 
         // You can also use indicators to save debug notes in replays.
         rc.setIndicatorString("Hello world!");
+
+        if (rc.getType() == UnitType.MOPPER && rc.getID() % 2 == 0) {
+            System.out.println("I'm a messenger");
+            isMessenger = true;
+        }
 
         while (true) {
             // This code runs during the entire lifespan of the robot, which is why it is in an infinite
@@ -112,32 +126,52 @@ public class RobotPlayer {
      * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
      */
     public static void runTower(RobotController rc) throws GameActionException{
-        // Pick a direction to build in.
-        Direction dir = directions[rng.nextInt(directions.length)];
-        MapLocation nextLoc = rc.getLocation().add(dir);
-        // Pick a random robot type to build.
-        int robotType = rng.nextInt(3);
-        if (robotType == 0 && rc.canBuildRobot(UnitType.SOLDIER, nextLoc)){
-            rc.buildRobot(UnitType.SOLDIER, nextLoc);
-            System.out.println("BUILT A SOLDIER");
+        if (rc.canUpgradeTower(rc.getLocation())) {
+            rc.upgradeTower(rc.getLocation());
         }
-        else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
-            rc.buildRobot(UnitType.MOPPER, nextLoc);
-            System.out.println("BUILT A MOPPER");
-        }
-        else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
-            // rc.buildRobot(UnitType.SPLASHER, nextLoc);
-            // System.out.println("BUILT A SPLASHER");
-            rc.setIndicatorString("SPLASHER NOT IMPLEMENTED YET");
+
+        if (savingTurns == 0) {
+            isSaving = false;
+            // Pick a direction to build in.
+            Direction dir = directions[rng.nextInt(directions.length)];
+            MapLocation nextLoc = rc.getLocation().add(dir);
+            // Pick a random robot type to build.
+            int robotType = rng.nextInt(3);
+            if (robotType == 0 && rc.canBuildRobot(UnitType.SOLDIER, nextLoc)){
+                rc.buildRobot(UnitType.SOLDIER, nextLoc);
+                System.out.println("BUILT A SOLDIER");
+            }
+            else if (robotType == 1 && rc.canBuildRobot(UnitType.MOPPER, nextLoc)){
+                rc.buildRobot(UnitType.MOPPER, nextLoc);
+                System.out.println("BUILT A MOPPER");
+            }
+            else if (robotType == 2 && rc.canBuildRobot(UnitType.SPLASHER, nextLoc)){
+                rc.buildRobot(UnitType.SPLASHER, nextLoc);
+                System.out.println("BUILT A SPLASHER");
+            }
+        } else {
+            rc.setIndicatorString("Saving for " + savingTurns + " more turns");
+            savingTurns--;
         }
 
         // Read incoming messages
         Message[] messages = rc.readMessages(-1);
         for (Message m : messages) {
             System.out.println("Tower received message: '#" + m.getSenderID() + " " + m.getBytes());
+
+            if (m.getBytes() == MessageType.SAVE_CHIPS.ordinal() && !isSaving) {
+                savingTurns = 15;
+                isSaving = true;
+            }
         }
 
         // TODO: can we attack other bots?
+        RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
+        for(RobotInfo robot: nearbyRobots){
+            if(rc.canAttack(robot.getLocation())){
+                rc.attack(robot.getLocation());
+            } 
+        }
     }
 
 
@@ -150,9 +184,14 @@ public class RobotPlayer {
         MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
         // Search for a nearby ruin to complete.
         MapInfo curRuin = null;
+        int curDist = 999999;
         for (MapInfo tile : nearbyTiles){
             if (tile.hasRuin()){
-                curRuin = tile;
+                int dist = tile.getMapLocation().distanceSquaredTo(rc.getLocation());
+                if (dist < curDist) {
+                    curRuin = tile;
+                    curDist = dist;
+                }
             }
         }
         if (curRuin != null){
@@ -189,6 +228,13 @@ public class RobotPlayer {
             rc.move(dir);
         }
 
+        if (rc.canAttack(nextLoc)) {
+            MapInfo nextLocInfo = rc.senseMapInfo(nextLoc);
+            if (!nextLocInfo.getPaint().isAlly()) {
+                rc.attack(nextLoc);
+            }
+        }
+
         // Try to paint beneath us as we walk to avoid paint penalties.
         // Avoiding wasting paint by re-painting our own tiles.
         MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
@@ -203,6 +249,19 @@ public class RobotPlayer {
      * This code is wrapped inside the infinite loop in run(), so it is called once per turn.
      */
     public static void runMopper(RobotController rc) throws GameActionException{
+        if (isMessenger) {
+            rc.setIndicatorDot(rc.getLocation(), 255, 0, 0);
+        }
+
+        if (isMessenger && isSaving && knownTowers.size() > 0) {
+            // bisa dipintarin lagi pilih mau balik ke tower mana
+            MapLocation dst = knownTowers.get(0);
+            Direction dir = rc.getLocation().directionTo(dst);
+            if (rc.canMove(dir)) {
+                rc.move(dir);
+            }
+        }
+        
         // Move and attack randomly.
         Direction dir = directions[rng.nextInt(directions.length)];
         MapLocation nextLoc = rc.getLocation().add(dir);
@@ -218,6 +277,23 @@ public class RobotPlayer {
         }
         // We can also move our code into different methods or classes to better organize it!
         updateEnemyRobots(rc);
+
+        if (isMessenger) {
+            updateFriendlyTowers(rc);
+            checkNearbyRuins(rc);
+        }
+    }
+
+    public static void runSplasher(RobotController rc) throws GameActionException {
+        Direction dir = directions[rng.nextInt(directions.length)];
+        MapLocation nextLoc = rc.getLocation().add(dir);
+
+        if (rc.canMove(dir)) {
+            rc.move(dir);
+        }
+        if (rc.canAttack(nextLoc)) {
+            rc.attack(nextLoc);
+        }
     }
 
     public static void updateEnemyRobots(RobotController rc) throws GameActionException{
@@ -242,4 +318,42 @@ public class RobotPlayer {
             }
         }
     }
+
+    public static void updateFriendlyTowers(RobotController rc) throws GameActionException {
+        RobotInfo[] allyRobots = rc.senseNearbyRobots(-1, rc.getTeam());
+        for (RobotInfo ally : allyRobots) {
+            if (!ally.getType().isTowerType()) continue;
+
+            MapLocation allyLoc = ally.location;
+            if (knownTowers.contains(allyLoc)) {
+                if (isSaving) {
+                    if (rc.canSendMessage(allyLoc)) {
+                        rc.sendMessage(allyLoc, MessageType.SAVE_CHIPS.ordinal());
+                        isSaving = false;
+                    }
+                }
+
+                continue;
+            }
+
+            knownTowers.add(allyLoc);
+        }
+    }
+
+    public static void checkNearbyRuins(RobotController rc) throws GameActionException {
+        MapInfo[] nearbyTiles = rc.senseNearbyMapInfos();
+        // Search for a nearby ruin to complete.
+        for (MapInfo tile : nearbyTiles){
+            if (!tile.hasRuin()) continue;
+            if (rc.senseRobotAtLocation(tile.getMapLocation()) != null) continue;
+
+            Direction dir = tile.getMapLocation().directionTo(rc.getLocation());
+            MapLocation markTile = tile.getMapLocation().add(dir);
+            if (!rc.senseMapInfo(markTile).getMark().isAlly()) continue;
+
+            isSaving = true;
+            return;
+        }       
+    }
+ 
 }
