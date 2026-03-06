@@ -2,6 +2,7 @@ package chamalet;
 
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.HashSet;
 
 import battlecode.common.Clock;
 import battlecode.common.Direction;
@@ -35,6 +36,16 @@ public class RobotPlayer {
     static ArrayList<MapLocation> knownTowers = new ArrayList<>();
     static boolean isSaving = false;
     static int savingTurns = 0;
+
+    static MapLocation target;
+    static boolean isTracing = false;
+    static Direction tracingDirection = null;
+    static int smallestDistance = 1000000;
+    static MapLocation closesLocation = null;
+    static int obstacleStarDist = 0;
+
+    static HashSet<MapLocation> line = null;
+    static MapLocation prevDest = null;
 
     /**
      * A random number generator.
@@ -93,7 +104,7 @@ public class RobotPlayer {
                 switch (rc.getType()){
                     case SOLDIER: runSoldier(rc); break; 
                     case MOPPER: runMopper(rc); break;
-                    case SPLASHER: break; // Consider upgrading examplefuncsplayer to use splashers!
+                    case SPLASHER: runSplasher(rc); break; // Consider upgrading examplefuncsplayer to use splashers!
                     default: runTower(rc); break;
                     }
                 }
@@ -150,8 +161,8 @@ public class RobotPlayer {
                 System.out.println("BUILT A SPLASHER");
             }
         } else {
-            rc.setIndicatorString("Saving for " + savingTurns + " more turns");
             savingTurns--;
+            rc.setIndicatorString("Saving for " + savingTurns + " more turns.");
         }
 
         // Read incoming messages
@@ -174,6 +185,152 @@ public class RobotPlayer {
         }
     }
 
+    public static void bug0(RobotController rc) throws GameActionException {
+        // target perlu didefinisikan ntar
+        Direction dir = rc.getLocation().directionTo(target);
+        if (rc.canMove(dir)) {
+            rc.move(dir);
+        } else {
+            for (int i = 0; i < 8; i++) {
+                dir = dir.rotateLeft();
+                if (rc.canMove(dir)) {
+                    rc.move(dir);
+                    break;
+                }
+            }
+        }
+    }
+
+    public static void bug1(RobotController rc) throws GameActionException {
+        if (!isTracing) {
+            // try to move towards the target
+            Direction dir = rc.getLocation().directionTo(target);
+            if (rc.canMove(dir)) {
+                rc.move(dir);
+            }
+            else {
+                // go into tracing mode
+                isTracing = true;
+                tracingDirection = dir;
+            }
+        }
+        else {
+            // circle the obstacle, ignore target direction
+            if (rc.getLocation().equals(closesLocation)) {
+                isTracing = false;
+                tracingDirection = null;
+                smallestDistance = 1000000;
+                closesLocation = null;
+            }
+            else {
+                int curDist = rc.getLocation().distanceSquaredTo(target);
+                if (curDist < smallestDistance) {
+                    smallestDistance = curDist;
+                    closesLocation = rc.getLocation();
+                }
+
+                if (rc.canMove(tracingDirection)) {
+                    rc.move(tracingDirection);
+                    tracingDirection.rotateRight();
+                    tracingDirection.rotateRight();
+                }
+                else {
+                    for (int i = 0; i < 8; i++) {
+                        tracingDirection = tracingDirection.rotateLeft();
+                        if (rc.canMove(tracingDirection)) {
+                            rc.move(tracingDirection);
+                            tracingDirection.rotateRight();
+                            tracingDirection.rotateRight();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static void bug2(RobotController rc) throws GameActionException {
+        if (!target.equals(prevDest)) {
+            prevDest = target;
+            line = createLine(target, rc.getLocation());
+        }
+
+        if (!isTracing) {
+            Direction dir = rc.getLocation().directionTo(target);
+            if (rc.canMove(dir)) {
+                rc.move(dir);
+            }
+            else {
+                // go into tracing mode
+                isTracing = true;
+                obstacleStarDist = rc.getLocation().distanceSquaredTo(target);
+                tracingDirection = dir;
+            }
+        }
+        else {
+            if (line.contains(rc.getLocation()) && rc.getLocation().distanceSquaredTo(target) < obstacleStarDist) {
+                isTracing = false;
+            }
+            else {
+                if (rc.canMove(tracingDirection)) {
+                    rc.move(tracingDirection);
+                    tracingDirection.rotateRight();
+                    tracingDirection.rotateRight();
+                }
+                else {
+                    for (int i = 0; i < 8; i++) {
+                        tracingDirection = tracingDirection.rotateLeft();
+                        if (rc.canMove(tracingDirection)) {
+                            rc.move(tracingDirection);
+                            tracingDirection.rotateRight();
+                            tracingDirection.rotateRight();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Bresenham's line algorithm
+    public static HashSet<MapLocation> createLine(MapLocation a, MapLocation b) {
+        HashSet<MapLocation> locs = new HashSet<>();
+        int x = a.x, y = a.y;
+        int dx = b.x - a.x;
+        int dy = b.y - a.y;
+        int sx = (int) Math.signum(dx);
+        int sy = (int) Math.signum(dy);
+        dx = Math.abs(dx);
+        dy = Math.abs(dy);
+        int d = Math.max(dx, dy);
+        int r = d/2;
+        if (dx > dy) {
+            for (int i = 0; i < d; i++) {
+                locs.add(new MapLocation(x, y));
+                x += sx;
+                r += dy;
+                if (r >= dx) {
+                    locs.add(new MapLocation(x, y));
+                    y += sy;
+                    r -= dx;
+                }
+            }
+        } 
+        else {
+            for (int i = 0; i < d; i++) {
+                locs.add(new MapLocation(x, y));
+                y += sy;
+                r += dx;
+                if (r >= dy) {
+                    locs.add(new MapLocation(x, y));
+                    x += sx;
+                    r -= dy;
+                }
+            }
+        }
+        locs.add(new MapLocation(x, y));
+        return locs;
+    }
 
     /**
      * Run a single turn for a Soldier.
@@ -194,6 +351,15 @@ public class RobotPlayer {
                 }
             }
         }
+
+        RobotInfo[] nearbyRobots = rc.senseNearbyRobots();
+        RobotInfo curTower = null;
+        for (RobotInfo tower : nearbyRobots){
+            if (tower.getType().ordinal() >= 0 && tower.getType().ordinal() <= 8){
+                curTower = tower;
+            }
+        }
+
         if (curRuin != null){
             MapLocation targetLoc = curRuin.getMapLocation();
             Direction dir = rc.getLocation().directionTo(targetLoc);
@@ -221,20 +387,25 @@ public class RobotPlayer {
             } 
         }
 
+        if (rc.getPaint() <= 100){
+            //go nearest tower
+            if(curTower != null){
+                if(rc.canTransferPaint(curTower.getLocation(), -50)){
+                    rc.transferPaint(curTower.getLocation(), -50);
+                }
+                else if(rc.canTransferPaint(curTower.getLocation(), -20)){
+                    rc.transferPaint(curTower.getLocation(), -20);
+                }
+            }
+            
+        }
+
         // Move and attack randomly if no objective.
         Direction dir = directions[rng.nextInt(directions.length)];
         MapLocation nextLoc = rc.getLocation().add(dir);
         if (rc.canMove(dir)){
             rc.move(dir);
         }
-
-        if (rc.canAttack(nextLoc)) {
-            MapInfo nextLocInfo = rc.senseMapInfo(nextLoc);
-            if (!nextLocInfo.getPaint().isAlly()) {
-                rc.attack(nextLoc);
-            }
-        }
-
         // Try to paint beneath us as we walk to avoid paint penalties.
         // Avoiding wasting paint by re-painting our own tiles.
         MapInfo currentTile = rc.senseMapInfo(rc.getLocation());
@@ -268,10 +439,10 @@ public class RobotPlayer {
         if (rc.canMove(dir)){
             rc.move(dir);
         }
-        if (rc.canMopSwing(dir)){
-            rc.mopSwing(dir);
-            System.out.println("Mop Swing! Booyah!");
-        }
+        // if (rc.canMopSwing(dir)){
+        //     rc.mopSwing(dir);
+        //     System.out.println("Mop Swing! Booyah!");
+        // }
         else if (rc.canAttack(nextLoc)){
             rc.attack(nextLoc);
         }
