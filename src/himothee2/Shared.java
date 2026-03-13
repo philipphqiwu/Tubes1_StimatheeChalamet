@@ -327,7 +327,7 @@ public class Shared {
                 }
             }
             int exitThreshold = (rc.getType() == UnitType.MOPPER) ? MOPPER_LOW_PAINT_THRESHOLD
-                : (rc.getType() == UnitType.SPLASHER) ? (int)(rc.getType().paintCapacity * 0.3)
+                : (rc.getType() == UnitType.SPLASHER) ? 80
                 : LOW_PAINT_THRESHOLD;
             if (rc.getPaint() > exitThreshold) {
                 state = preRetreatState != null ? preRetreatState : RobotState.EXPLORING;

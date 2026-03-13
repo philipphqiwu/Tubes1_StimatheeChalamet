@@ -36,7 +36,7 @@ public class SplasherPlayer {
     static ArrayList<MapLocation> enemyTowerMemory = new ArrayList<>();
 
     public static void runSplasher(RobotController rc) throws GameActionException {
-        int splasherRetreatThreshold = (int)(rc.getType().paintCapacity * 0.10);
+        int splasherRetreatThreshold = 20;
         if (state != RobotState.RETREAT && rc.getPaint() <= splasherRetreatThreshold && !knownTowers.isEmpty()) {
             preRetreatState = state;
             state = RobotState.RETREAT;
@@ -219,14 +219,17 @@ public class SplasherPlayer {
             }
         }
 
-        // Priority 2: remembered enemy tower positions — push past where they were
+        // Priority 2: remembered enemy tower positions — push past where they were.
+        // Use a known friendly tower (not current pos) as "deeper" reference so we don't
+        // accidentally mirror center back to center.
         if (!enemyTowerMemory.isEmpty()) {
             int idx = (rc.getID() + splasherTargetIdx) % enemyTowerMemory.size();
             splasherTargetIdx++;
             MapLocation remembered = enemyTowerMemory.get(idx);
-            // Push PAST the old tower location toward enemy base
-            MapLocation deeper = guessEnemyLocation(rc, rc.getLocation());
-            // Weighted midpoint — 2/3 toward the deeper enemy side
+            MapLocation ref = !knownTowers.isEmpty()
+                ? knownTowers.get(rc.getID() % knownTowers.size())
+                : getCornerRef(rc);
+            MapLocation deeper = guessEnemyLocation(rc, ref);
             int tx = (remembered.x + deeper.x * 2) / 3;
             int ty = (remembered.y + deeper.y * 2) / 3;
             tx = Math.max(0, Math.min(rc.getMapWidth() - 1, tx));
@@ -241,8 +244,24 @@ public class SplasherPlayer {
             return guessEnemyLocation(rc, knownTowers.get(idx));
         }
 
-        // Priority 4: push toward enemy side (not center!)
-        return guessEnemyLocation(rc, rc.getLocation());
+        // Priority 4: no intel at all — push toward a corner on the enemy side.
+        // Mirror a corner reference (not current pos) so we never land back at center.
+        // Diversify by ID so splashers fan out to different sectors.
+        return guessEnemyLocation(rc, getCornerRef(rc));
+    }
+
+    /**
+     * Returns a reference point anchored in our own quadrant (near a corner), diversified by ID.
+     * Mirroring this produces a point firmly in enemy territory rather than center.
+     */
+    static MapLocation getCornerRef(RobotController rc) {
+        int w = rc.getMapWidth();
+        int h = rc.getMapHeight();
+        // Four quadrant anchors – pick one based on ID so splashers spread
+        int sector = rc.getID() % 4;
+        int qx = (sector % 2 == 0) ? w / 4 : 3 * w / 4;
+        int qy = (sector < 2)      ? h / 4 : 3 * h / 4;
+        return new MapLocation(qx, qy);
     }
 
     // ========== SPLASH TARGETING ==========

@@ -64,6 +64,10 @@ public class SoldierPlayer {
     static boolean srpMarked = false;
     /** How many turns we've been stuck on one target. */
     static int srpStuckTurns = 0;
+    /** How many consecutive turns we've found no SRP candidate (idle turns). */
+    static int srpIdleTurns = 0;
+    /** Turn cap before a specialist falls back to tower-building. */
+    static final int SRP_IDLE_FALLBACK_TURNS = 25;
 
     static void clearPaintingState() {
         paintingRuinLoc = null;
@@ -106,10 +110,25 @@ public class SoldierPlayer {
             }
         }
 
-        // ---- Route SRP specialist to their own handler ----
-        if (isSRPSpecialist || state == RobotState.SRP_SPECIALIST) {
-            runSRPSpecialist(rc);
-            return;
+        // ---- Route SRP specialist ----
+        if (isSRPSpecialist) {
+            if (state == RobotState.SRP_SPECIALIST || state == RobotState.RETREAT) {
+                // Normal specialist work or retreat
+                runSRPSpecialist(rc);
+                return;
+            }
+            // Fallback EXPLORING mode: probe for SRP candidate each turn so we snap back quickly
+            MapLocation candidate = findBestSRPCandidate(rc);
+            if (candidate != null) {
+                srpSpecialistTarget = candidate;
+                srpMarked = false;
+                srpStuckTurns = 0;
+                srpIdleTurns = 0;
+                state = RobotState.SRP_SPECIALIST;
+                runSRPSpecialist(rc);
+                return;
+            }
+            // No candidate yet — fall through to normal EXPLORING/PAINTING_PATTERN logic below
         }
 
         // ---- Retreat threshold for regular soldiers ----
@@ -401,7 +420,6 @@ public class SoldierPlayer {
         }
         if (state == RobotState.RETREAT) {
             runRetreat(rc);
-            // After refill, go back to specialist mode
             if (state != RobotState.RETREAT) state = RobotState.SRP_SPECIALIST;
             return;
         }
@@ -430,6 +448,7 @@ public class SoldierPlayer {
                 && rc.canCompleteResourcePattern(srpSpecialistTarget)) {
                 rc.completeResourcePattern(srpSpecialistTarget);
                 rc.setIndicatorString("SRP SPEC ✓ completed @ " + srpSpecialistTarget);
+                forceDepart(rc, srpSpecialistTarget);
                 srpSpecialistTarget = null;
                 srpMarked = false;
                 srpStuckTurns = 0;
@@ -452,6 +471,9 @@ public class SoldierPlayer {
             srpSpecialistTarget = findBestSRPCandidate(rc);
             srpMarked = false;
             srpStuckTurns = 0;
+            if (srpSpecialistTarget != null) {
+                srpIdleTurns = 0; // reset idle counter when we find work
+            }
         }
 
         // ---- Work the target ----
@@ -481,6 +503,7 @@ public class SoldierPlayer {
                 if (rc.canCompleteResourcePattern(srpSpecialistTarget)) {
                     rc.completeResourcePattern(srpSpecialistTarget);
                     rc.setIndicatorString("SRP SPEC ✓ completed @ " + srpSpecialistTarget);
+                    forceDepart(rc, srpSpecialistTarget);
                     srpSpecialistTarget = null;
                     srpMarked = false;
                     srpStuckTurns = 0;
@@ -511,7 +534,17 @@ public class SoldierPlayer {
                 rc.setIndicatorString("SRP SPEC painting @ " + srpSpecialistTarget + (painted ? " ★" : ""));
             }
         } else {
-            // No SRP candidate visible — explore like a normal soldier (biased away from enemy)
+            // No SRP candidate visible — increment idle counter
+            srpIdleTurns++;
+            if (srpIdleTurns >= SRP_IDLE_FALLBACK_TURNS) {
+                // Been idle too long: switch to EXPLORING so we build towers next turn.
+                // runSoldier's routing will detect state==EXPLORING and fall through to normal logic.
+                state = RobotState.EXPLORING;
+                soldierExploreTurns = 0;
+                rc.setIndicatorString("SRP SPEC → EXPLORING (idle " + srpIdleTurns + "t)");
+                return;
+            }
+            // Still within patience — explore locally for new SRP areas
             if (rc.isMovementReady()) {
                 if (exploreDir == null) initExploreDir(rc);
                 boolean needNewDir = rc.getLocation().distanceSquaredTo(exploreLoc) <= 8
@@ -521,7 +554,6 @@ public class SoldierPlayer {
                     if (Shared.isNearEdge(rc, rc.getLocation())) {
                         exploreDir = Shared.pickExploreDir(rc, rc.getLocation());
                     } else {
-                        // Bias toward own side (away from enemies) to paint safe territory
                         int dirIdx = (rc.getID() + round / 20) % 8;
                         exploreDir = directions[dirIdx];
                     }
@@ -530,48 +562,107 @@ public class SoldierPlayer {
                 }
                 bug0(rc, exploreLoc);
             }
-            rc.setIndicatorString("SRP SPEC exploring...");
+            rc.setIndicatorString("SRP SPEC scouting... (idle:" + srpIdleTurns + "/" + SRP_IDLE_FALLBACK_TURNS + ")");
         }
 
-        // Always paint current tile if possible
-        if (rc.isActionReady()) {
-            MapInfo cur = rc.senseMapInfo(rc.getLocation());
-            if (!cur.getPaint().isAlly() && rc.canAttack(rc.getLocation())) {
-                if (srpSpecialistTarget != null && Shared.isWithinSRPPattern(srpSpecialistTarget, rc.getLocation())) {
-                    int dx = rc.getLocation().x - srpSpecialistTarget.x + 2;
-                    int dy = rc.getLocation().y - srpSpecialistTarget.y + 2;
+        // Always paint current or adjacent unpainted/enemy tile if possible
+        if (rc.isActionReady() && rc.getPaint() > LOW_PAINT_THRESHOLD) {
+            MapLocation me = rc.getLocation();
+            MapInfo cur = rc.senseMapInfo(me);
+            if (!cur.getPaint().isAlly() && rc.canAttack(me)) {
+                if (srpSpecialistTarget != null && Shared.isWithinSRPPattern(srpSpecialistTarget, me)) {
+                    int dx = me.x - srpSpecialistTarget.x + 2;
+                    int dy = me.y - srpSpecialistTarget.y + 2;
                     boolean wantSec = SRP_PATTERN[dx][dy] == 2;
-                    rc.attack(rc.getLocation(), wantSec);
+                    rc.attack(me, wantSec);
                 } else {
-                    rc.attack(rc.getLocation());
+                    rc.attack(me);
+                }
+            } else {
+                for (Direction d : directions) {
+                    MapLocation adj = me.add(d);
+                    if (rc.canAttack(adj)) {
+                        MapInfo info = rc.senseMapInfo(adj);
+                        if (!info.getPaint().isAlly() && !info.isWall() && !info.hasRuin()) {
+                            if (srpSpecialistTarget != null && Shared.isWithinSRPPattern(srpSpecialistTarget, adj)) {
+                                int dx = adj.x - srpSpecialistTarget.x + 2;
+                                int dy = adj.y - srpSpecialistTarget.y + 2;
+                                boolean wantSec = SRP_PATTERN[dx][dy] == 2;
+                                rc.attack(adj, wantSec);
+                            } else {
+                                rc.attack(adj);
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }
     }
 
     /**
-     * Find the best SRP center candidate in vision.
-     * Scans a 3×3 grid of aligned positions (multiples of 4 ±2) near the robot.
-     * Picks the one with the most tiles still needing paint.
+     * Find the best SRP center candidate.
+     *
+     * Scoring strategy: prefer candidates with FEWER unpainted tiles, so specialists
+     * finish patterns quickly. Candidates near known friendly towers get a bonus because
+     * tower patterns have already painted part of the 5×5 in ally colors — fewer recolors needed.
+     *
+     * Search order:
+     *   1. SRP grid positions near each known friendly tower (high value — partially pre-painted)
+     *   2. SRP grid positions within current vision (general scan)
      */
     static MapLocation findBestSRPCandidate(RobotController rc) throws GameActionException {
         MapLocation me = rc.getLocation();
         MapLocation bestCenter = null;
-        int bestUnpainted = -1;
+        // Lower is better: we want the candidate with fewest remaining tiles.
+        // Start at 26 (more than 5×5=25) so any real candidate beats it.
+        int bestUnpainted = 26;
 
+        // ---- Pass 1: scan near known friendly towers (bonus source of pre-painted tiles) ----
+        for (MapLocation tower : knownTowers) {
+            for (int dx = -4; dx <= 4; dx += 4) {
+                for (int dy = -4; dy <= 4; dy += 4) {
+                    MapLocation center = alignSRPCenter(tower.x + dx, tower.y + dy);
+                    if (!rc.onTheMap(center)) continue;
+                    if (!rc.canMarkResourcePattern(center)) continue;
+
+                    int unpainted = 0;
+                    boolean bad = false;
+                    for (int x = -2; x <= 2 && !bad; x++) {
+                        for (int y = -2; y <= 2 && !bad; y++) {
+                            MapLocation tile = center.translate(x, y);
+                            if (!rc.canSenseLocation(tile)) { unpainted++; continue; }
+                            MapInfo info = rc.senseMapInfo(tile);
+                            if (info.getPaint().isEnemy()) { bad = true; break; }
+                            boolean wantSec = SRP_PATTERN[x + 2][y + 2] == 2;
+                            PaintType want = wantSec ? PaintType.ALLY_SECONDARY : PaintType.ALLY_PRIMARY;
+                            if (info.getPaint() != want) unpainted++;
+                        }
+                    }
+                    if (bad || unpainted == 0) continue;
+                    // Tower-adjacent bonus: treat as 3 fewer tiles (they're safer/faster)
+                    int adjustedUnpainted = Math.max(1, unpainted - 3);
+                    if (adjustedUnpainted < bestUnpainted) {
+                        bestUnpainted = adjustedUnpainted;
+                        bestCenter = center;
+                    }
+                }
+            }
+        }
+
+        // ---- Pass 2: general scan of nearby grid positions (vision range ≈ 8 tiles) ----
         for (int dx = -8; dx <= 8; dx += 4) {
             for (int dy = -8; dy <= 8; dy += 4) {
                 MapLocation center = alignSRPCenter(me.x + dx, me.y + dy);
                 if (!rc.onTheMap(center)) continue;
                 if (!rc.canMarkResourcePattern(center)) continue;
 
-                // Count how many tiles need paint and check for enemy paint contamination
                 int unpainted = 0;
                 boolean bad = false;
                 for (int x = -2; x <= 2 && !bad; x++) {
                     for (int y = -2; y <= 2 && !bad; y++) {
                         MapLocation tile = center.translate(x, y);
-                        if (!rc.canSenseLocation(tile)) { unpainted++; continue; } // assume needs paint
+                        if (!rc.canSenseLocation(tile)) { unpainted++; continue; }
                         MapInfo info = rc.senseMapInfo(tile);
                         if (info.getPaint().isEnemy()) { bad = true; break; }
                         boolean wantSec = SRP_PATTERN[x + 2][y + 2] == 2;
@@ -579,9 +670,8 @@ public class SoldierPlayer {
                         if (info.getPaint() != want) unpainted++;
                     }
                 }
-                if (bad) continue;
-                if (unpainted == 0) continue; // already complete
-                if (unpainted > bestUnpainted) {
+                if (bad || unpainted == 0) continue;
+                if (unpainted < bestUnpainted) {
                     bestUnpainted = unpainted;
                     bestCenter = center;
                 }
@@ -837,8 +927,22 @@ public class SoldierPlayer {
                 MapLocation c = alignSRPCenter(me.x + dx, me.y + dy);
                 if (me.distanceSquaredTo(c) <= 2 && rc.canCompleteResourcePattern(c)) {
                     rc.completeResourcePattern(c);
+                    forceDepart(rc, c);
                 }
             }
+        }
+    }
+
+    /** Forces a soldier or specialist to immediately walk away from a completed SRP */
+    static void forceDepart(RobotController rc, MapLocation target) throws GameActionException {
+        exploreDir = target.directionTo(rc.getLocation());
+        if (exploreDir == Direction.CENTER) exploreDir = directions[rc.getID() % 8];
+        exploreLoc = Shared.extendToEdge(rc, rc.getLocation(), exploreDir);
+        exploreSetRound = rc.getRoundNum();
+        if (rc.isMovementReady()) {
+            if (rc.canMove(exploreDir)) rc.move(exploreDir);
+            else if (rc.canMove(exploreDir.rotateLeft())) rc.move(exploreDir.rotateLeft());
+            else if (rc.canMove(exploreDir.rotateRight())) rc.move(exploreDir.rotateRight());
         }
     }
 }

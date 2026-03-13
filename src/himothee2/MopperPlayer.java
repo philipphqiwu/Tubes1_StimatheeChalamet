@@ -189,10 +189,16 @@ public class MopperPlayer {
                 else if (rc.canMove(toward.rotateLeft())) rc.move(toward.rotateLeft());
                 else if (rc.canMove(toward.rotateRight())) rc.move(toward.rotateRight());
             } else if (rc.isMovementReady()) {
-                // Score movement: bias toward enemy paint (our bread and butter) and target
+                // Score movement: bias toward enemy paint and target.
+                // Use a known tower as the enemy-side reference (not current pos) to avoid
+                // mirroring center → center when the map is rotational and we're near center.
+                MapLocation enemySideRef = !knownTowers.isEmpty()
+                    ? knownTowers.get(rc.getID() % knownTowers.size())
+                    : getMopperCornerRef(rc);
+                MapLocation enemySide = guessEnemyLocation(rc, enemySideRef);
+
                 Direction bestDir = null;
-                int bestScore = -1;
-                MapLocation enemySide = guessEnemyLocation(rc, rc.getLocation());
+                int bestScore = Integer.MIN_VALUE;
 
                 for (Direction d : directions) {
                     if (!rc.canMove(d)) continue;
@@ -204,18 +210,19 @@ public class MopperPlayer {
                         if (p == PaintType.ENEMY_PRIMARY || p == PaintType.ENEMY_SECONDARY) score += 4;
                         else if (p == PaintType.EMPTY) score += 1;
                     }
-                    // Push toward target
+                    // Strong push toward attack target
                     if (targetEnemyRuin != null &&
                         newLoc.distanceSquaredTo(targetEnemyRuin) < rc.getLocation().distanceSquaredTo(targetEnemyRuin)) {
-                        score += 5;
+                        score += 8;
                     }
-                    // Bias toward enemy side
+                    // Bias toward enemy side (always push forward)
                     if (newLoc.distanceSquaredTo(enemySide) < rc.getLocation().distanceSquaredTo(enemySide)) {
-                        score += 3;
+                        score += 5;
                     }
                     if (score > bestScore) { bestScore = score; bestDir = d; }
                 }
-                if (bestDir != null && bestScore > 3) rc.move(bestDir);
+                // Always move if a direction was found — don't stall
+                if (bestDir != null) rc.move(bestDir);
                 else if (targetEnemyRuin != null) bug2(rc, targetEnemyRuin);
                 else bug0(rc, enemySide);
             }
@@ -393,5 +400,15 @@ public class MopperPlayer {
                 return;
             }
         }
+    }
+
+    /** Corner reference point in our own quadrant; mirroring gives actual enemy territory. */
+    static MapLocation getMopperCornerRef(RobotController rc) {
+        int w = rc.getMapWidth();
+        int h = rc.getMapHeight();
+        int sector = rc.getID() % 4;
+        int qx = (sector % 2 == 0) ? w / 4 : 3 * w / 4;
+        int qy = (sector < 2)      ? h / 4 : 3 * h / 4;
+        return new MapLocation(qx, qy);
     }
 }
