@@ -33,6 +33,8 @@ import static himothee2.Shared.updateSymmetryGuess;
 public class MopperPlayer {
 
     static MapLocation mopperHelpRuin = null;
+    static MapLocation pushTarget = null;
+    static int pushTargetAge = 0;
 
     public static void runMopper(RobotController rc) throws GameActionException {
         RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
@@ -165,12 +167,21 @@ public class MopperPlayer {
                     }
                     targetEnemyRuin = closest;
                 }
-                // Guess enemy positions
-                if (targetEnemyRuin == null && !knownTowers.isEmpty()) {
-                    targetEnemyRuin = guessEnemyLocation(rc, knownTowers.get(rng.nextInt(knownTowers.size())));
-                }
+                // Guess enemy positions if no known structures
                 if (targetEnemyRuin == null) {
-                    targetEnemyRuin = guessEnemyLocation(rc, rc.getLocation());
+                    pushTargetAge++;
+                    if (pushTarget != null && rc.getLocation().distanceSquaredTo(pushTarget) <= 8) {
+                        pushTarget = null;
+                    }
+                    if (pushTarget == null || pushTargetAge > 30) {
+                        MapLocation enemySideRef = !knownTowers.isEmpty()
+                            ? knownTowers.get(rc.getID() % knownTowers.size())
+                            : getMopperCornerRef(rc);
+                        MapLocation guessed = guessEnemyLocation(rc, enemySideRef);
+                        Direction out = rc.getLocation().directionTo(guessed);
+                        pushTarget = out != Direction.CENTER ? himothee2.Shared.extendToEdge(rc, guessed, out) : guessed;
+                        pushTargetAge = 0;
+                    }
                 }
             }
 
@@ -197,34 +208,67 @@ public class MopperPlayer {
                     : getMopperCornerRef(rc);
                 MapLocation enemySide = guessEnemyLocation(rc, enemySideRef);
 
-                Direction bestDir = null;
-                int bestScore = Integer.MIN_VALUE;
-
-                for (Direction d : directions) {
-                    if (!rc.canMove(d)) continue;
-                    MapLocation newLoc = rc.getLocation().add(d);
-                    int score = 0;
-                    MapInfo[] nearby = rc.senseNearbyMapInfos(newLoc, 5);
-                    for (MapInfo info : nearby) {
-                        PaintType p = info.getPaint();
-                        if (p == PaintType.ENEMY_PRIMARY || p == PaintType.ENEMY_SECONDARY) score += 4;
-                        else if (p == PaintType.EMPTY) score += 1;
+                // Anti-clumping: Calculate centroid of nearby allied Moppers
+                int nearbyMoppers = 0;
+                int mx = 0, my = 0;
+                for (RobotInfo ally : allyRobots) {
+                    if (ally.getType() == UnitType.MOPPER) {
+                        nearbyMoppers++;
+                        mx += ally.getLocation().x;
+                        my += ally.getLocation().y;
                     }
-                    // Strong push toward attack target
-                    if (targetEnemyRuin != null &&
-                        newLoc.distanceSquaredTo(targetEnemyRuin) < rc.getLocation().distanceSquaredTo(targetEnemyRuin)) {
-                        score += 8;
-                    }
-                    // Bias toward enemy side (always push forward)
-                    if (newLoc.distanceSquaredTo(enemySide) < rc.getLocation().distanceSquaredTo(enemySide)) {
-                        score += 5;
-                    }
-                    if (score > bestScore) { bestScore = score; bestDir = d; }
                 }
-                // Always move if a direction was found — don't stall
-                if (bestDir != null) rc.move(bestDir);
-                else if (targetEnemyRuin != null) bug2(rc, targetEnemyRuin);
-                else bug0(rc, enemySide);
+                MapLocation mopperCentroid = null;
+                if (nearbyMoppers > 0) {
+                    mopperCentroid = new MapLocation(mx / nearbyMoppers, my / nearbyMoppers);
+                }
+
+                MapLocation actualTarget = (targetEnemyRuin != null) ? targetEnemyRuin : pushTarget;
+                if (actualTarget == null) actualTarget = enemySide; // fallback
+                
+                if (himothee2.Shared.isTracing) {
+                    bug2(rc, actualTarget);
+                } else {
+                    Direction bestDir = null;
+                    int bestScore = Integer.MIN_VALUE;
+
+                    for (Direction d : directions) {
+                        if (!rc.canMove(d)) continue;
+                        MapLocation newLoc = rc.getLocation().add(d);
+                        int score = 0;
+                        MapInfo[] nearby = rc.senseNearbyMapInfos(newLoc, 5);
+                        for (MapInfo info : nearby) {
+                            PaintType p = info.getPaint();
+                            if (p == PaintType.ENEMY_PRIMARY || p == PaintType.ENEMY_SECONDARY) score += 4;
+                            else if (p == PaintType.EMPTY) score += 1;
+                        }
+                        // Strong push toward attack target
+                        if (newLoc.distanceSquaredTo(actualTarget) < rc.getLocation().distanceSquaredTo(actualTarget)) {
+                            score += 50;
+                        }
+                        // Anti-clumping applied
+                        if (mopperCentroid != null) {
+                            if (newLoc.distanceSquaredTo(mopperCentroid) < rc.getLocation().distanceSquaredTo(mopperCentroid)) {
+                                score -= 4; // Penalty for moving closer to other moppers
+                            }
+                        }
+
+                        if (score > bestScore) { bestScore = score; bestDir = d; }
+                    }
+                    
+                    if (bestDir != null) {
+                        MapLocation next = rc.getLocation().add(bestDir);
+                        if (next.distanceSquaredTo(actualTarget) >= rc.getLocation().distanceSquaredTo(actualTarget) 
+                            && !rc.canMove(rc.getLocation().directionTo(actualTarget))) {
+                            // Can't move closer using greedy, and straight path is blocked -> tracing mode!
+                            bug2(rc, actualTarget);
+                        } else {
+                            rc.move(bestDir);
+                        }
+                    } else {
+                        bug2(rc, actualTarget);
+                    }
+                }
             }
 
             // Swing at enemies after moving

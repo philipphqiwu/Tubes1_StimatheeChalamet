@@ -12,6 +12,7 @@ import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
 import himothee2.Shared.RobotState;
 import static himothee2.Shared.bug0;
+import static himothee2.Shared.bug2;
 import static himothee2.Shared.directions;
 import static himothee2.Shared.guessEnemyLocation;
 import static himothee2.Shared.knownEnemyTowers;
@@ -113,8 +114,9 @@ public class SplasherPlayer {
             for (MapInfo dc : depthCheck) {
                 if (!dc.isWall() && !dc.hasRuin() && dc.getPaint().isEnemy()) enemyTilesNearby++;
             }
-            boolean shouldSplash = (nearestEnemyTower != null && nearestTowerDist <= 20)
-                || enemyTilesNearby >= 3;
+            // Modified: require even more enemy tiles to splash, encouraging deeper pushing
+            boolean shouldSplash = (nearestEnemyTower != null && nearestTowerDist <= 9)
+                || enemyTilesNearby >= 8;
             if (shouldSplash) {
                 MapLocation bestTarget = findBestSplashTarget(rc, nearestEnemyTower);
                 if (bestTarget != null) {
@@ -133,44 +135,69 @@ public class SplasherPlayer {
             else if (rc.canMove(away.rotateLeft())) rc.move(away.rotateLeft());
             else if (rc.canMove(away.rotateRight())) rc.move(away.rotateRight());
         } else if (moveTarget != null && rc.isMovementReady()) {
-            Direction bestDir = null;
-            int bestScore = -9999;
+            if (himothee2.Shared.isTracing) {
+                bug2(rc, moveTarget);
+            } else {
+                Direction bestDir = null;
+                int bestScore = -9999;
+                
+                MapInfo[] vision = rc.senseNearbyMapInfos(-1);
 
-            for (Direction d : directions) {
-                if (!rc.canMove(d)) continue;
-                MapLocation next = rc.getLocation().add(d);
-                int score = 0;
+                for (Direction d : directions) {
+                    if (!rc.canMove(d)) continue;
+                    MapLocation next = rc.getLocation().add(d);
+                    int score = 0;
 
-                // Prefer enemy or empty paint
-                MapInfo nextInfo = rc.senseMapInfo(next);
-                PaintType p = nextInfo.getPaint();
-                if (p == PaintType.ENEMY_PRIMARY || p == PaintType.ENEMY_SECONDARY) score += 4;
-                else if (p == PaintType.EMPTY) score += 2;
+                    // Prefer enemy or empty paint
+                    MapInfo nextInfo = rc.senseMapInfo(next);
+                    PaintType p = nextInfo.getPaint();
+                    if (p == PaintType.ENEMY_PRIMARY || p == PaintType.ENEMY_SECONDARY) score += 4;
+                    else if (p == PaintType.EMPTY) score += 2;
 
-                // Strong push toward target (higher weight than before)
-                if (next.distanceSquaredTo(moveTarget) < rc.getLocation().distanceSquaredTo(moveTarget)) {
-                    score += 8;
-                }
+                    // Strong push toward target (higher weight than before)
+                    if (next.distanceSquaredTo(moveTarget) < rc.getLocation().distanceSquaredTo(moveTarget)) {
+                        score += 50;
+                    }
 
-                // Mild spread-out from nearby splashers (lower weight — don't override target push)
-                if (nearbySplashers >= 3) {
-                    if (next.distanceSquaredTo(splasherCentroid) > rc.getLocation().distanceSquaredTo(splasherCentroid)) {
-                        score += 2;
-                    } else {
-                        score -= 1;
+                    // Strong spread-out from nearby splashers
+                    if (nearbySplashers >= 1) { // Apply even if just 1 other splasher is nearby
+                        if (next.distanceSquaredTo(splasherCentroid) > rc.getLocation().distanceSquaredTo(splasherCentroid)) {
+                            score += 5; // Reward moving away
+                        } else {
+                            score -= 5; // Penalize moving closer
+                        }
+                    }
+                    
+                    // Active Seek Drive: heavily score directions that bring us closer to chunks of visible unpainted/enemy territory
+                    int seekScore = 0;
+                    for (MapInfo view : vision) {
+                        if (view.isWall() || view.hasRuin()) continue;
+                        if (view.getMapLocation().distanceSquaredTo(next) <= 9) {
+                            if (view.getPaint().isEnemy() || view.getPaint() == PaintType.EMPTY) {
+                                seekScore++;
+                            }
+                        }
+                    }
+                    score += (seekScore / 4); // Mitigated seek drive so it doesn't overpower target push
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestDir = d;
                     }
                 }
 
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestDir = d;
+                if (bestDir != null) {
+                    MapLocation next = rc.getLocation().add(bestDir);
+                    if (next.distanceSquaredTo(moveTarget) >= rc.getLocation().distanceSquaredTo(moveTarget) 
+                        && !rc.canMove(rc.getLocation().directionTo(moveTarget))) {
+                        // Greedily blocked -> enter tracing!
+                        bug2(rc, moveTarget);
+                    } else {
+                        rc.move(bestDir);
+                    }
+                } else {
+                    bug2(rc, moveTarget);
                 }
-            }
-
-            if (bestDir != null) {
-                rc.move(bestDir);
-            } else {
-                bug0(rc, moveTarget);
             }
         } else if (rc.isMovementReady()) {
             MapLocation enemySide = guessEnemyLocation(rc, rc.getLocation());
@@ -234,7 +261,9 @@ public class SplasherPlayer {
             int ty = (remembered.y + deeper.y * 2) / 3;
             tx = Math.max(0, Math.min(rc.getMapWidth() - 1, tx));
             ty = Math.max(0, Math.min(rc.getMapHeight() - 1, ty));
-            return new MapLocation(tx, ty);
+            MapLocation loc = new MapLocation(tx, ty);
+            Direction out = rc.getLocation().directionTo(loc);
+            return out != Direction.CENTER ? Shared.extendToEdge(rc, loc, out) : loc;
         }
 
         // Priority 3: mirror our towers to guess enemy positions — diversify by ID
@@ -247,7 +276,9 @@ public class SplasherPlayer {
         // Priority 4: no intel at all — push toward a corner on the enemy side.
         // Mirror a corner reference (not current pos) so we never land back at center.
         // Diversify by ID so splashers fan out to different sectors.
-        return guessEnemyLocation(rc, getCornerRef(rc));
+        MapLocation guessed = guessEnemyLocation(rc, getCornerRef(rc));
+        Direction out = rc.getLocation().directionTo(guessed);
+        return out != Direction.CENTER ? Shared.extendToEdge(rc, guessed, out) : guessed;
     }
 
     /**
