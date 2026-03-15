@@ -8,18 +8,18 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static victim.Shared.PAINT_HIGH;
-import static victim.Shared.PAINT_LOW;
-import static victim.Shared.bug2;
-import static victim.Shared.changeDefaultLocIfReached;
-import static victim.Shared.closestRefill;
-import static victim.Shared.defaultLoc;
-import static victim.Shared.directions;
-import static victim.Shared.isAtMapEdge;
-import static victim.Shared.isRefilling;
-import static victim.Shared.rng;
-import static victim.Shared.spawnTower;
-import static victim.Shared.target;
+import static thee.Shared.PAINT_HIGH;
+import static thee.Shared.PAINT_LOW;
+import static thee.Shared.bug2;
+import static thee.Shared.changeDefaultLocIfReached;
+import static thee.Shared.closestRefill;
+import static thee.Shared.defaultLoc;
+import static thee.Shared.directions;
+import static thee.Shared.isAtMapEdge;
+import static thee.Shared.isRefilling;
+import static thee.Shared.rng;
+import static thee.Shared.spawnTower;
+import static thee.Shared.target;
 
 public class SoldierPlayer {
 
