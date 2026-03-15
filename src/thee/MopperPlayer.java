@@ -6,7 +6,16 @@ import battlecode.common.MapInfo;
 import battlecode.common.MapLocation;
 import battlecode.common.PaintType;
 import battlecode.common.RobotController;
-import static victim.Shared.*;
+import static thee.Shared.allyTowersLoc;
+import static thee.Shared.changeDefaultLocIfReached;
+import static thee.Shared.checkIncompleteRuin;
+import static thee.Shared.defaultLoc;
+import static thee.Shared.directions;
+import static thee.Shared.isMessenger;
+import static thee.Shared.isSaving;
+import static thee.Shared.rng;
+import static thee.Shared.updateAllyTowers;
+import static thee.Shared.updateEnemyRobots;
 
 public class MopperPlayer {
 
