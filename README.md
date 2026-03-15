@@ -174,3 +174,7 @@ Keterangan:
 - Philipp Hamara - 13524101
 - Emilio Justin - 13524043
 - Vincent Rionarlie - 13524031
+
+## Link Youtube
+
+https://www.youtube.com/@vinr6074
