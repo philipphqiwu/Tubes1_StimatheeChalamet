@@ -5,7 +5,14 @@ import battlecode.common.GameActionException;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static victim.Shared.*;
+import static thee.Shared.defaultLoc;
+import static thee.Shared.isMessenger;
+import static thee.Shared.mapHeight;
+import static thee.Shared.mapWidth;
+import static thee.Shared.pickRandomDefaultLoc;
+import static thee.Shared.spawnTower;
+import static thee.Shared.target;
+import static thee.Shared.turnCount;
 
 public class RobotPlayer {
 
