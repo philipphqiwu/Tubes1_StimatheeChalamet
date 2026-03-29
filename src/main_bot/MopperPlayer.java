@@ -1,4 +1,22 @@
-package himothee2;
+package main_bot;
+
+import static main_bot.Shared.LATEGAME_OFFENSIVE_TURNS;
+import static main_bot.Shared.MOPPER_LOW_PAINT_THRESHOLD;
+import static main_bot.Shared.bug0;
+import static main_bot.Shared.bug2;
+import static main_bot.Shared.directions;
+import static main_bot.Shared.guessEnemyLocation;
+import static main_bot.Shared.isWithinPattern;
+import static main_bot.Shared.knownEnemyTowers;
+import static main_bot.Shared.knownTowers;
+import static main_bot.Shared.preRetreatState;
+import static main_bot.Shared.reportEnemyTowers;
+import static main_bot.Shared.rng;
+import static main_bot.Shared.runRetreat;
+import static main_bot.Shared.state;
+import static main_bot.Shared.targetEnemyRuin;
+import static main_bot.Shared.updateFriendlyTowers;
+import static main_bot.Shared.updateSymmetryGuess;
 
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
@@ -8,24 +26,7 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static himothee2.Shared.LATEGAME_OFFENSIVE_TURNS;
-import static himothee2.Shared.MOPPER_LOW_PAINT_THRESHOLD;
-import himothee2.Shared.RobotState;
-import static himothee2.Shared.bug0;
-import static himothee2.Shared.bug2;
-import static himothee2.Shared.directions;
-import static himothee2.Shared.guessEnemyLocation;
-import static himothee2.Shared.isWithinPattern;
-import static himothee2.Shared.knownEnemyTowers;
-import static himothee2.Shared.knownTowers;
-import static himothee2.Shared.preRetreatState;
-import static himothee2.Shared.reportEnemyTowers;
-import static himothee2.Shared.rng;
-import static himothee2.Shared.runRetreat;
-import static himothee2.Shared.state;
-import static himothee2.Shared.targetEnemyRuin;
-import static himothee2.Shared.updateFriendlyTowers;
-import static himothee2.Shared.updateSymmetryGuess;
+import main_bot.Shared.RobotState;
 
 /**
  * Mopper logic: attack-first lifesteal, paint transfer healer, help build at ruins.
@@ -179,7 +180,7 @@ public class MopperPlayer {
                             : getMopperCornerRef(rc);
                         MapLocation guessed = guessEnemyLocation(rc, enemySideRef);
                         Direction out = rc.getLocation().directionTo(guessed);
-                        pushTarget = out != Direction.CENTER ? himothee2.Shared.extendToEdge(rc, guessed, out) : guessed;
+                        pushTarget = out != Direction.CENTER ? main_bot.Shared.extendToEdge(rc, guessed, out) : guessed;
                         pushTargetAge = 0;
                     }
                 }
@@ -226,7 +227,7 @@ public class MopperPlayer {
                 MapLocation actualTarget = (targetEnemyRuin != null) ? targetEnemyRuin : pushTarget;
                 if (actualTarget == null) actualTarget = enemySide; // fallback
                 
-                if (himothee2.Shared.isTracing) {
+                if (main_bot.Shared.isTracing) {
                     bug2(rc, actualTarget);
                 } else {
                     Direction bestDir = null;

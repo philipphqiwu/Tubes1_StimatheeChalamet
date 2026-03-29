@@ -1,16 +1,17 @@
-package himothee2;
+package main_bot;
+
+import static main_bot.Shared.EARLY_GAME_TURNS;
+import static main_bot.Shared.LATEGAME_OFFENSIVE_TURNS;
+import static main_bot.Shared.SPLASHER_UNLOCK_TURNS;
+import static main_bot.Shared.mapScale;
+import static main_bot.Shared.moneyTowerPattern;
+import static main_bot.Shared.paintTowerPattern;
+import static main_bot.Shared.turnCount;
 
 import battlecode.common.Clock;
 import battlecode.common.GameActionException;
 import battlecode.common.RobotController;
 import battlecode.common.UnitType;
-import static himothee2.Shared.EARLY_GAME_TURNS;
-import static himothee2.Shared.LATEGAME_OFFENSIVE_TURNS;
-import static himothee2.Shared.SPLASHER_UNLOCK_TURNS;
-import static himothee2.Shared.mapScale;
-import static himothee2.Shared.moneyTowerPattern;
-import static himothee2.Shared.paintTowerPattern;
-import static himothee2.Shared.turnCount;
 
 /**
  * RobotPlayer is the entry point for all robots.

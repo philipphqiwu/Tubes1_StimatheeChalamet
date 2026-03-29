@@ -1,4 +1,17 @@
-package thee;
+package alternative_bots_2;
+
+import static alternative_bots_2.Shared.PAINT_HIGH;
+import static alternative_bots_2.Shared.PAINT_LOW;
+import static alternative_bots_2.Shared.bug2;
+import static alternative_bots_2.Shared.changeDefaultLocIfReached;
+import static alternative_bots_2.Shared.closestRefill;
+import static alternative_bots_2.Shared.defaultLoc;
+import static alternative_bots_2.Shared.directions;
+import static alternative_bots_2.Shared.isAtMapEdge;
+import static alternative_bots_2.Shared.isRefilling;
+import static alternative_bots_2.Shared.rng;
+import static alternative_bots_2.Shared.spawnTower;
+import static alternative_bots_2.Shared.target;
 
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
@@ -8,18 +21,6 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static thee.Shared.PAINT_HIGH;
-import static thee.Shared.PAINT_LOW;
-import static thee.Shared.bug2;
-import static thee.Shared.changeDefaultLocIfReached;
-import static thee.Shared.closestRefill;
-import static thee.Shared.defaultLoc;
-import static thee.Shared.directions;
-import static thee.Shared.isAtMapEdge;
-import static thee.Shared.isRefilling;
-import static thee.Shared.rng;
-import static thee.Shared.spawnTower;
-import static thee.Shared.target;
 
 public class SoldierPlayer {
 

@@ -1,4 +1,15 @@
-package thee;
+package alternative_bots_2;
+
+import static alternative_bots_2.Shared.allyTowersLoc;
+import static alternative_bots_2.Shared.changeDefaultLocIfReached;
+import static alternative_bots_2.Shared.checkIncompleteRuin;
+import static alternative_bots_2.Shared.defaultLoc;
+import static alternative_bots_2.Shared.directions;
+import static alternative_bots_2.Shared.isMessenger;
+import static alternative_bots_2.Shared.isSaving;
+import static alternative_bots_2.Shared.rng;
+import static alternative_bots_2.Shared.updateAllyTowers;
+import static alternative_bots_2.Shared.updateEnemyRobots;
 
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
@@ -6,16 +17,6 @@ import battlecode.common.MapInfo;
 import battlecode.common.MapLocation;
 import battlecode.common.PaintType;
 import battlecode.common.RobotController;
-import static thee.Shared.allyTowersLoc;
-import static thee.Shared.changeDefaultLocIfReached;
-import static thee.Shared.checkIncompleteRuin;
-import static thee.Shared.defaultLoc;
-import static thee.Shared.directions;
-import static thee.Shared.isMessenger;
-import static thee.Shared.isSaving;
-import static thee.Shared.rng;
-import static thee.Shared.updateAllyTowers;
-import static thee.Shared.updateEnemyRobots;
 
 public class MopperPlayer {
 

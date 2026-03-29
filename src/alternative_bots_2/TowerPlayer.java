@@ -1,5 +1,9 @@
-package thee;
+package alternative_bots_2;
 
+import static alternative_bots_2.Shared.directions;
+import static alternative_bots_2.Shared.skipTurns;
+
+import alternative_bots_2.Shared.MessageType;
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
 import battlecode.common.MapInfo;
@@ -8,9 +12,6 @@ import battlecode.common.Message;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import thee.Shared.MessageType;
-import static thee.Shared.directions;
-import static thee.Shared.skipTurns;
 
 public class TowerPlayer {
 

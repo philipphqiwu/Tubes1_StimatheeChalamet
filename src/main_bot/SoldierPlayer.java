@@ -1,4 +1,31 @@
-package himothee2;
+package main_bot;
+
+import static main_bot.Shared.LATEGAME_OFFENSIVE_TURNS;
+import static main_bot.Shared.LOW_PAINT_THRESHOLD;
+import static main_bot.Shared.SPLASHER_UNLOCK_TURNS;
+import static main_bot.Shared.SRP_PATTERN;
+import static main_bot.Shared.SRP_TOWER_MIN;
+import static main_bot.Shared.bug0;
+import static main_bot.Shared.bug2;
+import static main_bot.Shared.checkNearbyRuins;
+import static main_bot.Shared.directions;
+import static main_bot.Shared.exploreDir;
+import static main_bot.Shared.exploreLoc;
+import static main_bot.Shared.exploreSetRound;
+import static main_bot.Shared.extendToEdge;
+import static main_bot.Shared.getIsSecondary;
+import static main_bot.Shared.guessEnemyLocation;
+import static main_bot.Shared.initExploreDir;
+import static main_bot.Shared.knownEnemyTowers;
+import static main_bot.Shared.knownTowers;
+import static main_bot.Shared.mapScale;
+import static main_bot.Shared.preRetreatState;
+import static main_bot.Shared.reportEnemyTowers;
+import static main_bot.Shared.runRetreat;
+import static main_bot.Shared.state;
+import static main_bot.Shared.targetEnemyRuin;
+import static main_bot.Shared.updateFriendlyTowers;
+import static main_bot.Shared.updateSymmetryGuess;
 
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
@@ -8,33 +35,7 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static himothee2.Shared.LATEGAME_OFFENSIVE_TURNS;
-import static himothee2.Shared.LOW_PAINT_THRESHOLD;
-import himothee2.Shared.RobotState;
-import static himothee2.Shared.SPLASHER_UNLOCK_TURNS;
-import static himothee2.Shared.SRP_PATTERN;
-import static himothee2.Shared.SRP_TOWER_MIN;
-import static himothee2.Shared.bug0;
-import static himothee2.Shared.bug2;
-import static himothee2.Shared.checkNearbyRuins;
-import static himothee2.Shared.directions;
-import static himothee2.Shared.exploreDir;
-import static himothee2.Shared.exploreLoc;
-import static himothee2.Shared.exploreSetRound;
-import static himothee2.Shared.extendToEdge;
-import static himothee2.Shared.getIsSecondary;
-import static himothee2.Shared.guessEnemyLocation;
-import static himothee2.Shared.initExploreDir;
-import static himothee2.Shared.knownEnemyTowers;
-import static himothee2.Shared.knownTowers;
-import static himothee2.Shared.mapScale;
-import static himothee2.Shared.preRetreatState;
-import static himothee2.Shared.reportEnemyTowers;
-import static himothee2.Shared.runRetreat;
-import static himothee2.Shared.state;
-import static himothee2.Shared.targetEnemyRuin;
-import static himothee2.Shared.updateFriendlyTowers;
-import static himothee2.Shared.updateSymmetryGuess;
+import main_bot.Shared.RobotState;
 
 /**
  * Soldier logic: exploring, building towers, painting patterns, attacking, SRP.

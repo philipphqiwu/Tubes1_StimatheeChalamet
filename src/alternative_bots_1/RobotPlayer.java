@@ -1,4 +1,4 @@
-package chamalet;
+package alternative_bots_1;
 
 import battlecode.common.*;
 import java.util.HashSet;

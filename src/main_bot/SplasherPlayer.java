@@ -1,4 +1,18 @@
-package himothee2;
+package main_bot;
+
+import static main_bot.Shared.bug0;
+import static main_bot.Shared.bug2;
+import static main_bot.Shared.directions;
+import static main_bot.Shared.guessEnemyLocation;
+import static main_bot.Shared.knownEnemyTowers;
+import static main_bot.Shared.knownTowers;
+import static main_bot.Shared.preRetreatState;
+import static main_bot.Shared.reportEnemyTowers;
+import static main_bot.Shared.runRetreat;
+import static main_bot.Shared.state;
+import static main_bot.Shared.targetEnemyRuin;
+import static main_bot.Shared.updateFriendlyTowers;
+import static main_bot.Shared.updateSymmetryGuess;
 
 import java.util.ArrayList;
 
@@ -10,20 +24,7 @@ import battlecode.common.PaintType;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import himothee2.Shared.RobotState;
-import static himothee2.Shared.bug0;
-import static himothee2.Shared.bug2;
-import static himothee2.Shared.directions;
-import static himothee2.Shared.guessEnemyLocation;
-import static himothee2.Shared.knownEnemyTowers;
-import static himothee2.Shared.knownTowers;
-import static himothee2.Shared.preRetreatState;
-import static himothee2.Shared.reportEnemyTowers;
-import static himothee2.Shared.runRetreat;
-import static himothee2.Shared.state;
-import static himothee2.Shared.targetEnemyRuin;
-import static himothee2.Shared.updateFriendlyTowers;
-import static himothee2.Shared.updateSymmetryGuess;
+import main_bot.Shared.RobotState;
 
 /**
  * Splasher logic: pushing into enemy territory, splash-attacking, kiting towers.
@@ -135,7 +136,7 @@ public class SplasherPlayer {
             else if (rc.canMove(away.rotateLeft())) rc.move(away.rotateLeft());
             else if (rc.canMove(away.rotateRight())) rc.move(away.rotateRight());
         } else if (moveTarget != null && rc.isMovementReady()) {
-            if (himothee2.Shared.isTracing) {
+            if (main_bot.Shared.isTracing) {
                 bug2(rc, moveTarget);
             } else {
                 Direction bestDir = null;

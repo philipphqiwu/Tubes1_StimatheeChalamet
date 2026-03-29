@@ -1,18 +1,19 @@
-package thee;
+package alternative_bots_2;
+
+import static alternative_bots_2.Shared.defaultLoc;
+import static alternative_bots_2.Shared.isMessenger;
+import static alternative_bots_2.Shared.mapHeight;
+import static alternative_bots_2.Shared.mapWidth;
+import static alternative_bots_2.Shared.pickRandomDefaultLoc;
+import static alternative_bots_2.Shared.spawnTower;
+import static alternative_bots_2.Shared.target;
+import static alternative_bots_2.Shared.turnCount;
 
 import battlecode.common.Clock;
 import battlecode.common.GameActionException;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static thee.Shared.defaultLoc;
-import static thee.Shared.isMessenger;
-import static thee.Shared.mapHeight;
-import static thee.Shared.mapWidth;
-import static thee.Shared.pickRandomDefaultLoc;
-import static thee.Shared.spawnTower;
-import static thee.Shared.target;
-import static thee.Shared.turnCount;
 
 public class RobotPlayer {
 

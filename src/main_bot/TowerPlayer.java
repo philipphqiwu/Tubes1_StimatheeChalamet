@@ -1,4 +1,26 @@
-package himothee2;
+package main_bot;
+
+import static main_bot.Shared.EARLY_GAME_TURNS;
+import static main_bot.Shared.LATEGAME_OFFENSIVE_TURNS;
+import static main_bot.Shared.SPLASHER_UNLOCK_TURNS;
+import static main_bot.Shared.decodeEnemyTowerMessage;
+import static main_bot.Shared.decodeSaveChipsMessage;
+import static main_bot.Shared.decodeSymMessage;
+import static main_bot.Shared.directions;
+import static main_bot.Shared.encodeEnemyTowerMessage;
+import static main_bot.Shared.encodeSaveChipsMessage;
+import static main_bot.Shared.encodeSymMessage;
+import static main_bot.Shared.isEnemyTowerMessage;
+import static main_bot.Shared.isSaveChipsMessage;
+import static main_bot.Shared.isSaving;
+import static main_bot.Shared.isSymMessage;
+import static main_bot.Shared.knownEnemyTowers;
+import static main_bot.Shared.saveChipTarget;
+import static main_bot.Shared.savingTurns;
+import static main_bot.Shared.spawnCount;
+import static main_bot.Shared.symHorizontal;
+import static main_bot.Shared.symRotational;
+import static main_bot.Shared.symVertical;
 
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
@@ -8,27 +30,6 @@ import battlecode.common.Message;
 import battlecode.common.RobotController;
 import battlecode.common.RobotInfo;
 import battlecode.common.UnitType;
-import static himothee2.Shared.EARLY_GAME_TURNS;
-import static himothee2.Shared.LATEGAME_OFFENSIVE_TURNS;
-import static himothee2.Shared.SPLASHER_UNLOCK_TURNS;
-import static himothee2.Shared.decodeEnemyTowerMessage;
-import static himothee2.Shared.decodeSaveChipsMessage;
-import static himothee2.Shared.decodeSymMessage;
-import static himothee2.Shared.directions;
-import static himothee2.Shared.encodeEnemyTowerMessage;
-import static himothee2.Shared.encodeSaveChipsMessage;
-import static himothee2.Shared.encodeSymMessage;
-import static himothee2.Shared.isEnemyTowerMessage;
-import static himothee2.Shared.isSaveChipsMessage;
-import static himothee2.Shared.isSaving;
-import static himothee2.Shared.isSymMessage;
-import static himothee2.Shared.knownEnemyTowers;
-import static himothee2.Shared.saveChipTarget;
-import static himothee2.Shared.savingTurns;
-import static himothee2.Shared.spawnCount;
-import static himothee2.Shared.symHorizontal;
-import static himothee2.Shared.symRotational;
-import static himothee2.Shared.symVertical;
 
 /**
  * Tower logic: spawning units, relaying messages, upgrading, attacking enemies.

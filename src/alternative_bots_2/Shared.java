@@ -1,4 +1,4 @@
-package thee;
+package alternative_bots_2;
 
 import java.util.ArrayList;
 import java.util.HashSet;
